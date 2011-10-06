@@ -61,7 +61,7 @@ class BaseHandler(object):
     def queryset(self, request):
         return self.model.objects.all()
 
-    def value_from_tuple(tu, name):
+    def value_from_tuple(self, tu, name):
         for int_, n in tu:
             if n == name:
                 return int_

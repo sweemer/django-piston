@@ -65,9 +65,7 @@ class rc_factory(object):
                 else:
                     self._container = [content]
                     self._is_string = True
-
             content = property(HttpResponse._get_content, _set_content)            
-
         return HttpResponseWrapper(r, content_type='text/plain', status=c)
     
 rc = rc_factory()
@@ -84,7 +82,6 @@ def validate(v_form, operation='POST'):
     @decorator
     def wrap(f, self, request, *a, **kwa):
         form = v_form(getattr(request, operation))
-    
         if form.is_valid():
             setattr(request, 'form', form)
             return f(self, request, *a, **kwa)
@@ -110,14 +107,12 @@ def throttle(max_requests, timeout=60*60, extra=''):
         """
         In DEBUG mode, don't throttle. This includes tests.
         """
-        if settings.DEBUG:
+        if settings.TEST_MODE:
             return f(self, request, *args, **kwargs)
-        
         if request.user.is_authenticated():
             ident = request.user.username
         else:
             ident = request.META.get('REMOTE_ADDR', None)
-        
         if hasattr(request, 'throttle_extra'):
             """
             Since we want to be able to throttle on a per-
@@ -126,7 +121,6 @@ def throttle(max_requests, timeout=60*60, extra=''):
             object. If so, append the identifier name with it.
             """
             ident += ':%s' % str(request.throttle_extra)
-        
         if ident:
             """
             Preferrably we'd use incr/decr here, since they're
@@ -135,22 +129,17 @@ def throttle(max_requests, timeout=60*60, extra=''):
             stable, you can change it here.
             """
             ident += ':%s' % extra
-            
             now = time.time()
             count, expiration = cache.get(ident, (1, None))
-            
             if expiration is None:
                 expiration = now + timeout
-            
             if count >= max_requests and expiration > now:
                 t = rc.THROTTLED
                 wait = int(expiration - now)
                 t.content = 'Throttled, wait %d seconds.' % wait
                 t['Retry-After'] = wait
                 return t
-            
             cache.set(ident, (count+1, expiration), (expiration - now))
-        
         return f(self, request, *args, **kwargs)
     return wrap
 
@@ -178,7 +167,6 @@ def coerce_put_post(request):
         if hasattr(request, '_post'):
             del request._post
             del request._files
-        
         try:
             request.method = "POST"
             request._load_post_and_files()
@@ -187,7 +175,6 @@ def coerce_put_post(request):
             request.META['REQUEST_METHOD'] = 'POST'
             request._load_post_and_files()
             request.META['REQUEST_METHOD'] = 'PUT'
-            
         request.PUT = request.POST
 
 
@@ -202,15 +189,13 @@ class Mimer(object):
     
     def __init__(self, request):
         self.request = request
-        
+    
     def is_multipart(self):
         content_type = self.content_type()
-
         if content_type is not None:
             return content_type.lstrip().startswith('multipart')
-
         return False
-
+    
     def loader_for_type(self, ctype):
         """
         Gets a function ref to deserialize content
@@ -220,21 +205,18 @@ class Mimer(object):
             for mime in mimes:
                 if ctype.startswith(mime):
                     return loadee
-                    
+    
     def content_type(self):
         """
         Returns the content type of the request in all cases where it is
         different than a submitted form - application/x-www-form-urlencoded
         """
         type_formencoded = "application/x-www-form-urlencoded"
-
         ctype = self.request.META.get('CONTENT_TYPE', type_formencoded)
-        
         if type_formencoded in ctype:
             return None
-        
         return ctype
-
+    
     def translate(self):
         """
         Will look at the `Content-type` sent by the client, and maybe
@@ -253,11 +235,9 @@ class Mimer(object):
         
         if not self.is_multipart() and ctype:
             loadee = self.loader_for_type(ctype)
-            
             if loadee:
                 try:
                     self.request.data = loadee(self.request.raw_post_data)
-                        
                     # Reset both POST and PUT from request, as its
                     # misleading having their presence around.
                     self.request.POST = self.request.PUT = dict()
@@ -266,13 +246,12 @@ class Mimer(object):
                     raise MimerDataException
             else:
                 self.request.data = None
-
         return self.request
-                
+    
     @classmethod
     def register(cls, loadee, types):
         cls.TYPES[loadee] = types
-        
+    
     @classmethod
     def unregister(cls, loadee):
         return cls.TYPES.pop(loadee)
@@ -290,23 +269,19 @@ def require_mime(*mimes):
     def wrap(f, self, request, *args, **kwargs):
         m = Mimer(request)
         realmimes = set()
-
         rewrite = { 'json':   'application/json',
                     'yaml':   'application/x-yaml',
                     'xml':    'text/xml',
                     'pickle': 'application/python-pickle' }
-
-        for idx, mime in enumerate(mimes):
+        for mime in mimes:
             realmimes.add(rewrite.get(mime, mime))
-
         if not m.content_type() in realmimes:
             return rc.BAD_REQUEST
-
         return f(self, request, *args, **kwargs)
     return wrap
 
 require_extended = require_mime('json', 'yaml', 'xml', 'pickle')
-    
+
 def send_consumer_mail(consumer):
     """
     Send a consumer an email depending on what their status is.
@@ -323,9 +298,7 @@ def send_consumer_mail(consumer):
             subject += "has been rejected."
         else: 
             subject += "is awaiting approval."
-
     template = "piston/mails/consumer_%s.txt" % consumer.status    
-    
     try:
         body = loader.render_to_string(template, 
             { 'consumer' : consumer, 'user' : consumer.user })
@@ -335,20 +308,15 @@ def send_consumer_mail(consumer):
         these emails sent.
         """
         return 
-
     try:
         sender = settings.PISTON_FROM_EMAIL
     except AttributeError:
         sender = settings.DEFAULT_FROM_EMAIL
-
     if consumer.user:
         send_mail(_(subject), body, sender, [consumer.user.email], fail_silently=True)
-
     if consumer.status == 'pending' and len(settings.ADMINS):
         mail_admins(_(subject), body, fail_silently=True)
-
     if settings.DEBUG and consumer.user:
         print "Mail being sent, to=%s" % consumer.user.email
         print "Subject: %s" % _(subject)
         print body
-
