@@ -1,6 +1,5 @@
 import time
-from django.http import HttpResponseNotAllowed, HttpResponseForbidden, HttpResponse, HttpResponseBadRequest
-from django.core.urlresolvers import reverse
+from django.http import HttpResponse
 from django.core.cache import cache
 from django import get_version as django_version
 from django.core.mail import send_mail, mail_admins
@@ -9,8 +8,6 @@ from django.utils.translation import ugettext as _
 from django.template import loader, TemplateDoesNotExist
 from django.contrib.sites.models import Site
 from decorator import decorator
-
-from datetime import datetime, timedelta
 
 __version__ = '0.2.3rc1'
 
@@ -29,7 +26,7 @@ class rc_factory(object):
                  CREATED = ('Created', 201),
                  DELETED = ('', 204), # 204 says "Don't send a body!"
                  BAD_REQUEST = ('Bad Request', 400),
-                 FORBIDDEN = ('Forbidden', 401),
+                 FORBIDDEN = ('Forbidden', 403),
                  NOT_FOUND = ('Not Found', 404),
                  DUPLICATE_ENTRY = ('Conflict/Duplicate', 409),
                  NOT_HERE = ('Gone', 410),
@@ -110,11 +107,17 @@ def throttle(max_requests, timeout=60*60, extra=''):
     """
     @decorator
     def wrap(f, self, request, *args, **kwargs):
+        """
+        In DEBUG mode, don't throttle. This includes tests.
+        """
+        if settings.DEBUG:
+            return f(self, request, *args, **kwargs)
+        
         if request.user.is_authenticated():
             ident = request.user.username
         else:
             ident = request.META.get('REMOTE_ADDR', None)
-    
+        
         if hasattr(request, 'throttle_extra'):
             """
             Since we want to be able to throttle on a per-
@@ -132,22 +135,22 @@ def throttle(max_requests, timeout=60*60, extra=''):
             stable, you can change it here.
             """
             ident += ':%s' % extra
-    
+            
             now = time.time()
             count, expiration = cache.get(ident, (1, None))
-
+            
             if expiration is None:
                 expiration = now + timeout
-
+            
             if count >= max_requests and expiration > now:
                 t = rc.THROTTLED
                 wait = int(expiration - now)
                 t.content = 'Throttled, wait %d seconds.' % wait
                 t['Retry-After'] = wait
                 return t
-
+            
             cache.set(ident, (count+1, expiration), (expiration - now))
-    
+        
         return f(self, request, *args, **kwargs)
     return wrap
 
