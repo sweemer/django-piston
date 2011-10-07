@@ -133,7 +133,7 @@ def throttle(max_requests, timeout=60*60, extra=''):
             count, expiration = cache.get(ident, (1, None))
             if expiration is None:
                 expiration = now + timeout
-            if count >= max_requests and expiration > now:
+            if count > max_requests and expiration > now:
                 t = rc.THROTTLED
                 wait = int(expiration - now)
                 t.content = 'Throttled, wait %d seconds.' % wait
