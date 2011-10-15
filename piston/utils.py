@@ -33,7 +33,7 @@ class rc_factory(object):
                  INTERNAL_ERROR = ('Internal Error', 500),
                  NOT_IMPLEMENTED = ('Not Implemented', 501),
                  THROTTLED = ('Throttled', 503))
-
+    
     def __getattr__(self, attr):
         """
         Returns a fresh `HttpResponse` when getting 
@@ -44,7 +44,7 @@ class rc_factory(object):
             (r, c) = self.CODES.get(attr)
         except TypeError:
             raise AttributeError(attr)
-
+        
         class HttpResponseWrapper(HttpResponse):
             """
             Wrap HttpResponse and make sure that the internal _is_string 
@@ -65,11 +65,23 @@ class rc_factory(object):
                 else:
                     self._container = [content]
                     self._is_string = True
-            content = property(HttpResponse._get_content, _set_content)            
+            
+            content = property(HttpResponse._get_content, _set_content)
+            
+            def __call__(self, content):
+                """
+                Make this class callable for the purpose of setting the HTTP body.
+                e.g. 'rc.CREATED(obj)' will return the obj in the HTTP body instead
+                of 'Created'.
+                """
+                self._container = content
+                self._is_string = False
+                return self
+        
         return HttpResponseWrapper(r, content_type='text/plain', status=c)
-    
+
 rc = rc_factory()
-    
+
 class FormValidationError(Exception):
     def __init__(self, form):
         self.form = form
