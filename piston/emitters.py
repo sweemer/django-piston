@@ -154,9 +154,11 @@ class Emitter(object):
             get_absolute_uri = False
             if handler or fields:
                 v = lambda f: getattr(data, f.attname)
-                if handler:
+                if handler and not fields:
                     fields = getattr(handler, 'fields')
-                if not fields or hasattr(handler, 'fields'):
+                # Only use an existing handler's field spec, if we haven't
+                # defined our own.
+                if not fields and hasattr(handler, 'fields'):
                     """
                     Fields was not specified, try to find the correct
                     version in the typemapper we were sent.
