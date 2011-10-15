@@ -59,12 +59,12 @@ class rc_factory(object):
                 HttpResponse.content although this bug report (feature request)
                 suggests that it should: http://code.djangoproject.com/ticket/9403 
                 """
-                if not isinstance(content, basestring) and hasattr(content, '__iter__'):
-                    self._container = content
-                    self._is_string = False
-                else:
-                    self._container = [content]
+                if isinstance(content, basestring):
                     self._is_string = True
+                    self._container = [content]
+                else:
+                    self._is_string = False
+                    self._container = content
             
             content = property(HttpResponse._get_content, _set_content)
             
@@ -74,8 +74,7 @@ class rc_factory(object):
                 e.g. 'rc.CREATED(obj)' will return the obj in the HTTP body instead
                 of 'Created'.
                 """
-                self._container = content
-                self._is_string = False
+                self._set_content(content)
                 return self
         
         return HttpResponseWrapper(r, content_type='text/plain', status=c)
