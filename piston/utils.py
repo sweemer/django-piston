@@ -77,7 +77,7 @@ class rc_factory(object):
                 self._set_content(content)
                 return self
         
-        return HttpResponseWrapper(r, content_type='text/plain', status=c)
+        return HttpResponseWrapper(r, status=c)
 
 rc = rc_factory()
 
