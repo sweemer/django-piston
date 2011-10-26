@@ -1,3 +1,4 @@
+import logging
 import time
 from django.http import HttpResponse
 from django.core.cache import cache
@@ -8,6 +9,8 @@ from django.utils.translation import ugettext as _
 from django.template import loader, TemplateDoesNotExist
 from django.contrib.sites.models import Site
 from decorator import decorator
+
+logger = logging.getLogger('django')
 
 __version__ = '0.2.3rc1'
 
@@ -149,6 +152,7 @@ def throttle(max_requests, timeout=60*60, extra=''):
                 wait = int(expiration - now)
                 t.content = 'Throttled, wait %d seconds.' % wait
                 t['Retry-After'] = wait
+                logger.warn("Request from %s for resource '%s' throttled, wait %d seconds", ident, request.path, wait)
                 return t
             cache.set(ident, (count+1, expiration), (expiration - now))
         return f(self, request, *args, **kwargs)
