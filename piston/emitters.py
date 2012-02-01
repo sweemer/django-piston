@@ -121,6 +121,8 @@ class Emitter(object):
                     ret = _any(f())
             elif repr(thing).startswith("<django.db.models.fields.related.RelatedManager"):
                 ret = _any(thing.all())
+            elif repr(thing).startswith("<django.db.models.fields.related.ManyRelatedManager"):
+                ret = _any(thing.all())
             else:
                 ret = smart_unicode(thing, strings_only=True)
 
